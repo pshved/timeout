@@ -1,0 +1,182 @@
+
+INTRODUCTION
+============
+
+The `timeout` script is a resource monitoring program for limiting time and
+memory consumption of black-boxed processes under Linux.  It runs a command
+you specify in the command line and watches for its memory and time
+consumption, interrupting the process if it goes out of the limits, and
+notifying the user with the preset message.
+
+The killer feature of this script (and, actually, the reason why it appeared)
+is that it not only watches the process spawned directly, but also keeps track
+of its subsequently forked children.  You may choose if the scope of the
+watched processes is constrained by process group or by the process tree.
+
+`timeout` may optionally detect hangups, or print time consumption breakdown.
+
+
+INSTALLATION
+============
+
+Installation is neither required nor supported.  Just place the script
+wherever you feel convenient and invoke it as a usual Linux command.
+
+You will need Perl 5 to run the script, and the /proc filesystem mounted.
+
+
+USAGE
+=====
+
+Like most of such wrapping scripts (nice, ionice, nohup), invocation is:
+
+  timeout [options] command [arguments]
+
+The basic options are:
+
+* `-t T` - set up CPU+SYS time limit to T seconds
+* `-m M` - set up virtual memory limit to M megabytes
+* `TIMEOUT_IDSTR` environment variable - a custom string prepended to the
+  message about resource violation (to distinguish from the lines printed by
+  the command itself).  The message itself may be:
+  - `TIMEOUT` - time limit is exhausted
+  - `MEM` - memory limit is exhausted
+  - `HANGUP` - hangup detected (see below)
+
+ After the message the number of seconds the process has been running for is
+ printed.
+
+
+Advanced options:
+
+* `-p NAME1:.*regexp1.*;NAME2.*regexp2.*` - collect statistics for children
+  with specified commands.  NAMEs define buckets, and regexps (Perl format)
+  define matching children that fall into these buckets.
+
+  If a pattern begins with `CHILD:`, then the runtime of the children of the
+  matching process (match being performed with the rest of the pattern) is
+  collected under this category.  Note that this is an only way to collect
+  statistics of time consumed by the children that last for fractions of a
+  second only.
+
+* `-o outfile` - a file to dump bucket statistics collected by `-p` option.
+
+* `--no-allow-hangups` - disable hangup detection.  If you have specified
+  buckets through the `-p` option, then if the CPU time in any of the buckets
+  does not increase during some time, the timeout script reasons that the
+  controlled process hanged up, and terminated it.  This option disables this
+  functionality.
+
+More options may be read in the script itself.  More documentation will be
+added in the future releases!
+
+
+EXAMPLES
+========
+
+Since you already have Perl to run the script itself, the examples will
+utilize it.
+
+Basic time limiting:
+
+    ./timeout -t 2 perl -e 'while ($i<100000000) {$i++;}'
+    Outputs:
+    TIMEOUT 2.04 CPU
+
+Basic memory limiting (100M of virtual memory):
+
+    ./timeout -m 1000000 perl -e 'while ($i<100000000) {$a->{$i} = $i++;}'
+    Outputs:
+    MEM 8.55
+
+Limit both time and memory (adjust number to match the command above):
+
+    ./timeout -m 1000000 -t 9 perl -e 'while ($i<100000000) {$x->{$i} = $i++;}'
+    Outputs:
+    MEM 8.57
+    ./timeout -m 1000000 -t 8 perl -e 'while ($i<100000000) {$x->{$i} = $i++;}'
+    Outputs:
+    TIMEOUT 8.02 CPU
+
+Limit time with a lot of short child processes:
+
+    ./timeout -t 2 perl -e 'while(1){ system qw(perl -e while($i<500){$i++;}); }'
+    Outputs (in 4 seconds):
+    TIMEOUT 2.01 CPU
+
+Collect statistics for `heavy' processes:
+
+    ./timeout -p '.*perl.*,PERL' perl -e 'for (1..20_000_000) {$i++;}'
+    Outputs:
+    <time name="PERL">1400</time>
+
+Collect statistics for `lightweight' children:
+
+    ./timeout -t 10 -p '.*perl.*,PERL;CHILD:.*perl.*,KIDS' perl -e 'for (1..2_000) {system qw(perl -e while($i<500000){$i++;}); $i++;}'
+    Outputs:
+    TIMEOUT 10.18 CPU
+    <time name="PERL">640</time>
+    <time name="KIDS">10160</time>
+
+Lightweight children should be tracked with special `CHILD:` prefix in their
+pattern, compare the above with:
+
+    ./timeout -t 10 -p '.*perl.*,PERL' perl -e 'for (1..2_000) {system qw(perl -e while($i<500000){$i++;}); $i++;}'
+    Outputs:
+    TIMEOUT 10.06 CPU
+    <time name="PERL">830</time>
+
+Why is the rest not shown in the bucket statistics? All processes spawned are
+Perl-s, but the short-living ones aren't tracked fully, since timeout doesn't
+wake up often enough.
+
+Detect hangups:
+
+    ./timeout -p '.*sleep.*,SLEEP' -t 5 sleep 10000
+    Outputs:
+    HANGUP 6
+
+
+
+IMPLEMENTATION DETAILS
+======================
+
+The script wakes up several times a second and checks if the process tree (or
+group) controlled does not violate the limits.
+
+More explanations how the script works and why it couldn't be implemented
+differently may be found here:
+
+http://coldattic.info/shvedsky/pro/blogs/a-foo-walks-into-a-bar/posts/40
+
+
+KNOWN ISSUES
+============
+
+The script is slow.  It's implemented in Perl, but that's not the reason as
+itself.  Performance of certain portions of it may easily be improved.  Our
+measurements demonstrated that it consumes up to 2% of the CPU time during its
+work.
+
+Sometimes waitpid call from inside SIGALRM handler returns -1 for no apparent
+reason.  This return value is ignored, and the appropriate warning is printed,
+but the cause of such a behavior is still unknown.
+
+SIGTERM-sleep-SIGKILL termination sequence is probably implemented poorly, and
+it sometimes does not get to sending SIGKILL if SIGTERM doesn't kill the
+process controlled.  The reasons are still unknown.
+
+The interface is a mess, as the script had been under requirements-driven
+development without a specific plan.
+
+
+ACKNOWLEDGMENTS
+===============
+
+The script was initially developed in the Institute for System Programming of
+Russian Academy of Sciences (http://ispras.ru/en/) for Linux Driver
+Verification project (http://forge.ispras.ru/projects/ldv) in 2010-2011 by
+Pavel Shved with some contributions from Alexander Strakh.
+
+
+
