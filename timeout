@@ -143,7 +143,7 @@ while ($status eq 'wait'){
 	}elsif ($arrived == -1){
 		# Something happened!
 		print_uinfo($uinfo);
-		print "ldv-timeout: WARNING: Wait($blackbox_pid) failed: $child_errno\n";
+		print "timeout: WARNING: Wait($blackbox_pid) failed: $child_errno\n";
 		exit 0;
 	}else{
 		# Check if limits are exhausted (they should be updated by signal handler).
@@ -258,6 +258,7 @@ sub update_time
 		# If hires_proc_runtime doesn't return a value (the $pid died before it tried), we keep the old value of time.  The error is not greater than ualarm interval.
 		my ($pid_time,$pid_cum_time) = hires_proc_runtime($pid);
 		if (defined $pid_time){
+			printf STDERR "timeout: pid $pid own $pid_time kids $pid_cum_time\n" if $debug;
 			$cumulative_time += $pid_time + $pid_cum_time;
 		}
 	});
@@ -323,10 +324,10 @@ sub kill_process_group_safely
 	$dying = 1;
 	# Reset alarm handler (we need it for sleep to work)
 	$SIG{'ALRM'} = 'DEFAULT';
-	print STDERR "Timeout: Sending TERM\n" if $debug;
+	print STDERR "timeout: Sending TERM\n" if $debug;
 	signal_to_process_group_safely($pgrp,SIGTERM) unless $just_kill;
 	sleep(1);
-	print STDERR "Timeout: Sending KILL\n" if $debug;
+	print STDERR "timeout: Sending KILL\n" if $debug;
 	signal_to_process_group_safely($pgrp,SIGKILL);
 }
 
@@ -428,6 +429,7 @@ sub get_patterns
 		my %patterns = ();
 		foreach (@splitted_patterns) {
 			my ($pattern, $name) = split(/,/,$_);
+			printf STDERR "timeout: pattern $pattern for bucket $name initialized\n" if $debug;
 			$patterns{$pattern} = {name=>$name, ptime=>0, pids=>{}};
 		}
 		return {%patterns};
