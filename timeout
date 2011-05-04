@@ -22,6 +22,7 @@ my $allow_hangups = '';
 my $ticklimit = undef;
 my $memlimit = undef;
 my $strpat = undef;
+# Output for statistic buckets (STDERR if unspecified)
 my $output = undef;
 my $reference = undef;
 my $watchfor = 'tree';
@@ -401,22 +402,25 @@ sub update_info_by_ucmd
 #
 sub print_uinfo
 {
-	defined $output and (open(FIL,">>", $output) or die "Can't open output file: $!\n");
+	if (defined $output){
+		open(FIL,">>", $output) or die "Can't open output file: $!\n";
+	}else{
+		open(FIL, ">&STDERR");
+	}
 	my ($strpat) = @_;
 	my $reftext="";
-	defined $reference and $reftext="ref=\"$reference\"";
+	defined $reference and $reftext="ref=\"$reference\" ";
 	# Sum up times for equal names
 	my %name_val = ();
 	foreach my $key( keys %{$strpat}) {
 		my $sp = $strpat->{$key};
 
 		scalar keys %{$sp->{pids}} or $sp->{term_time} or next;
-		defined $output or next;
 		$name_val{$sp->{name}} ||= 0;
 		$name_val{$sp->{name}}  += ($sp->{ptime} + $sp->{term_time});
 	}
 	for my $name (keys %name_val){
-		print(FIL "<time ".$reftext." name=\"".$name."\">".sprintf("%.0f", 1000*$name_val{$name})."</time>\n");
+		print(FIL "<time ${reftext}name=\"".$name."\">".sprintf("%.0f", 1000*$name_val{$name})."</time>\n");
 	}
 	defined $output and close FIL;
 }
