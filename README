@@ -35,7 +35,7 @@ Like most of such wrapping scripts (nice, ionice, nohup), invocation is:
 The basic options are:
 
 * `-t T` - set up CPU+SYS time limit to T seconds
-* `-m M` - set up virtual memory limit to M megabytes
+* `-m M` - set up virtual memory limit to M kilobytes
 * `TIMEOUT_IDSTR` environment variable - a custom string prepended to the
   message about resource violation (to distinguish from the lines printed by
   the command itself).  The message itself may be:

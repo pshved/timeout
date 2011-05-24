@@ -67,6 +67,7 @@ GetOptions(
 my $uinfo = get_patterns($strpat);
 
 my $uwait = int (1_000_000 / $frequency);
+my $uflush_time = 100_000;
 
 # String to identify thes script's prints in the output
 my $id_str = $ENV{'TIMEOUT_IDSTR'} || '';
@@ -101,7 +102,7 @@ my $dying = 0;
 use Data::Dumper;
 
 # Now we'll just keep polling status of the process until we notice that resources are exhausted or until the child finishes
-use Time::HiRes qw( ualarm );
+use Time::HiRes qw( ualarm usleep );
 
 # see sub update_time for explanations of this structure
 my $timeinfo = { total => 0, finished => 0, current => {} };
@@ -149,7 +150,7 @@ while ($status eq 'wait'){
 	if ($@ =~ /Assume waitpid return (.*)/){
 		$arrived = $1;
 	}else{
-		print_uinfo($uinfo,$fulltime);
+		print_uinfo('INTERNAL',$uinfo,$fulltime);
 		die "Fail: $@";
 	}
 	if ($arrived == $blackbox_pid){
@@ -158,46 +159,29 @@ while ($status eq 'wait'){
 		$status = 'exit'
 	}elsif ($arrived == -1){
 		# Something happened!
-		print_uinfo($uinfo);
+		print_uinfo('INTERNAL',$uinfo);
 		print "timeout: WARNING: Wait($blackbox_pid) failed: $child_errno\n";
 		exit 0;
 	}else{
 		# Check if limits are exhausted (they should be updated by signal handler).
 		# First kill, then print the script's verdict, so that it's less likely to mingle with the output of the process being controlled.
-		if (defined $timelimit && $timeinfo->{total} > $timelimit){
+		if (my $reason = limits_exceeded()){
 			kill_process_group_safely($blackbox_pid);
 			# have some sleep for output to be flushed
-			sleep(1);
-			print STDERR "${id_str}TIMEOUT $timeinfo->{total} CPU\n";
-			print_uinfo($uinfo);
-			exit 0;
-		}
-		# Sometimes the controlling process may inherently hang up.  Then we don't interrupt it.
-		if (defined $ticklimit && !$allow_hangups && $timeinfo->{ticks_stale} > $ticklimit) {
-			kill_process_group_safely($blackbox_pid);
-			sleep(1);
-			print STDERR "${id_str}HANGUP ".ceil($timeinfo->{ticks_stale}/$frequency)."\n";
-			print_uinfo($uinfo);
-			exit 0;
-		}
-		if (defined $memlimit && $meminfo > $memlimit){
-			kill_process_group_safely($blackbox_pid);
-			sleep(1);
-			print STDERR "${id_str}MEM $timeinfo->{total}\n";
-			print_uinfo($uinfo);
+			usleep($uflush_time);
+			print_uinfo($reason,$uinfo);
 			exit 0;
 		}
 	}
 }
 
-print_uinfo($uinfo);
+print_uinfo('FINISHED',$uinfo);
 exit $box_status;
 
 #-----------------------------------------------
 use POSIX;
 my $ticksize;
 BEGIN { $ticksize = POSIX::sysconf(&POSIX::_SC_CLK_TCK) or die "Couldn't get ticksize";}
-
 
 # Function that traverses process tree (according to watchfor setting) and invokes the function supplied for each applicable process
 sub foreach_applicable_process
@@ -417,6 +401,11 @@ sub update_info_by_ucmd
 #
 sub print_uinfo
 {
+	my $reason = shift;
+	# Print generic information to STDERR
+	my $ticks = $timeinfo->{ticks_stale} || 0;
+	printf STDERR "${id_str}%s CPU %.2f MEM %d STALE %d\n", $reason, $timeinfo->{total}, $meminfo, ceil($ticks/$frequency);
+
 	if (defined $output){
 		open(FIL,">>", $output) or die "Can't open output file: $!\n";
 	}else{
@@ -455,4 +444,18 @@ sub get_patterns
 	}else{
 		return {'.*' => {name=>'ALL', prtime=>0, pids=>{}}};
 	}
+}
+
+# Check if limits are exhaused, and return the reason why, if any.  Otherwise, return undef.
+sub limits_exceeded
+{
+	if (defined $timelimit && $timeinfo->{total} > $timelimit){
+		return 'TIMEOUT';
+	}elsif (defined $ticklimit && !$allow_hangups && $timeinfo->{ticks_stale} > $ticklimit) {
+	# Sometimes the controlling process may inherently hang up.  Then we don't interrupt it.
+		return 'HANGUP';
+	}elsif (defined $memlimit && $meminfo > $memlimit){
+		return 'MEM';
+	}
+	return undef;
 }
