@@ -49,7 +49,7 @@ The basic options are:
 
 Advanced options:
 
-* `-p NAME1:.*regexp1.*;NAME2.*regexp2.*` - collect statistics for children
+* `-p .*regexp1.*,NAME1;.*regexp2.*,NAME2` - collect statistics for children
   with specified commands.  NAMEs define buckets, and regexps (Perl format)
   define matching children that fall into these buckets.
 
