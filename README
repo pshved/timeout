@@ -42,6 +42,7 @@ The basic options are:
   - `TIMEOUT` - time limit is exhausted
   - `MEM` - memory limit is exhausted
   - `HANGUP` - hangup detected (see below)
+  - `SIGNAL` - the timeout process was killed by a signal
 
  After the message the number of seconds the process has been running for is
  printed.

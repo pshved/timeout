@@ -89,6 +89,7 @@ unless ($blackbox_pid){
 }
 # Make sure we kill forked child on exit
 sub when_die{
+	print_uinfo('SIGNAL',$uinfo);
 	kill_process_group_safely($blackbox_pid);
 	exit -1;
 };
