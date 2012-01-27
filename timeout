@@ -48,6 +48,8 @@ my $frequency = 10;
 my $debug = '';
 # Whether we do not do this term-kill stuff, and just kill processes at once
 my $just_kill = '';
+# Suppress printing stats when there was no resource violation
+my $info_on_success = 1;
 
 GetOptions(
 	'timelimit|t=i'=>\$timelimit,
@@ -61,6 +63,7 @@ GetOptions(
 	'watchfor|w=s'=>\$watchfor,
 	'debug!'=>\$debug,
 	'just-kill'=>\$just_kill,
+	'info-on-success!'=>\$info_on_success,
 ) or usage;
 
 @ARGV or usage;
@@ -180,7 +183,8 @@ while ($status eq 'wait'){
 	}
 }
 
-print_uinfo('FINISHED',$uinfo);
+# 'FINISHED' string has a special meaning in print_uinfo!
+print_uinfo('FINISHED',$uinfo) if $info_on_success;
 exit $box_status;
 
 #-----------------------------------------------
@@ -409,7 +413,7 @@ sub print_uinfo
 	my $reason = shift;
 	# Print generic information to STDERR
 	my $ticks = $timeinfo->{ticks_stale} || 0;
-	printf STDERR "${id_str}%s CPU %.2f MEM %d MAXMEM %d STALE %d\n", $reason, $timeinfo->{total}, $meminfo, $maxmem, ceil($ticks/$frequency);
+	printf STDERR "${id_str}%s CPU %.2f MEM %d MAXMEM %d STALE %d\n", $reason, $timeinfo->{total}, $meminfo, $maxmem, ceil($ticks/$frequency) if ($reason ne 'FINISHED') || $info_on_success;
 
 	if (defined $output){
 		open(FIL,">>", $output) or die "Can't open output file: $!\n";

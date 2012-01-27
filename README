@@ -68,6 +68,9 @@ Advanced options:
   controlled process hanged up, and terminated it.  This option disables this
   functionality.
 
+* `--no-info-on-success` - disable printing usage statistics if the
+  controlled process has been successfully terminated.
+
 More options may be read in the script itself.  More documentation will be
 added in the future releases!
 
