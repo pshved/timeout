@@ -179,7 +179,7 @@ while ($status eq 'wait'){
 	}
 }
 
-print_uinfo('FINISHED',$uinfo);
+#print_uinfo('FINISHED',$uinfo);
 exit $box_status;
 
 #-----------------------------------------------
