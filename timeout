@@ -34,7 +34,7 @@ use Time::HiRes qw( gettimeofday );
 
 my $timelimit = undef;
 my $hanguplimit = undef;
-my $kill_stale = 1;
+my $kill_stale = '';
 my $ticklimit = undef;
 my $memlimit = undef;
 my $strpat = undef;
@@ -56,7 +56,8 @@ my $confess = '';
 GetOptions(
 	'timelimit|t=i'=>\$timelimit,
 	'hanguplimit|h=i'=>\$hanguplimit,
-	'hangup-detection!'=>\$kill_stale,
+	'detect-hangup!'=>\$kill_stale,
+	'detect-hangups!'=>\$kill_stale,
 	# allow-hangups is kept for backward compatibility.
 	'allow-hangups!'=>\$kill_stale,
 	'memlimit|m=i'=>\$memlimit,
