@@ -34,7 +34,7 @@ use Time::HiRes qw( gettimeofday );
 
 my $timelimit = undef;
 my $hanguplimit = undef;
-my $allow_hangups = '';
+my $kill_stale = 1;
 my $ticklimit = undef;
 my $memlimit = undef;
 my $strpat = undef;
@@ -50,11 +50,15 @@ my $debug = '';
 my $just_kill = '';
 # Suppress printing stats when there was no resource violation
 my $info_on_success = 1;
+# Do not conceal the exit code of the controlled process if timeout kills it.
+my $confess = '';
 
 GetOptions(
 	'timelimit|t=i'=>\$timelimit,
 	'hanguplimit|h=i'=>\$hanguplimit,
-	'allow-hangups!'=>\$allow_hangups,
+	'hangup-detection!'=>\$kill_stale,
+	# allow-hangups is kept for backward compatibility.
+	'allow-hangups!'=>\$kill_stale,
 	'memlimit|m=i'=>\$memlimit,
 	'frequency|x=i'=>\$frequency,
 	'pattern|p=s'=>\$strpat,
@@ -467,7 +471,7 @@ sub limits_exceeded
 {
 	if (defined $timelimit && $timeinfo->{total} > $timelimit){
 		return 'TIMEOUT';
-	}elsif (defined $ticklimit && !$allow_hangups && $timeinfo->{ticks_stale} > $ticklimit) {
+	}elsif (defined $ticklimit && $kill_stale && $timeinfo->{ticks_stale} > $ticklimit) {
 	# Sometimes the controlling process may inherently hang up.  Then we don't interrupt it.
 		return 'HANGUP';
 	}elsif (defined $memlimit && $meminfo > $memlimit){

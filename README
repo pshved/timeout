@@ -60,9 +60,12 @@ Advanced options:
   statistics of time consumed by the children that last for fractions of a
   second only.
 
+	*WARNING!* Specifying `-p` option enables hangup detection!  A stale
+  process will be killed even if it awaits user input!  See below how to fix.
+
 * `-o outfile` - a file to dump bucket statistics collected by `-p` option.
 
-* `--no-allow-hangups` - disable hangup detection.  If you have specified
+* `--no-hangup-detection` - disable hangup detection.  If you have specified
   buckets through the `-p` option, then if the CPU time in any of the buckets
   does not increase during some time, the timeout script reasons that the
   controlled process hanged up, and terminated it.  This option disables this
