@@ -163,7 +163,14 @@ while ($status eq 'wait'){
 	}
 	if ($arrived == $blackbox_pid){
 		# Child process terminated.
-		$box_status = $child_retv>>8;
+		# "Simulate" shell behavior, when signal code is returned as exit code.  See http://www.gnu.org/software/bash/manual/html_node/Exit-Status.html for more info.
+		if (($child_retv > 0) && (($child_retv >> 8) == 0)){
+			# The 8th bit indicates if the core was dumped.  If it was not, we are to add 128 anyway, so just set the bit.
+			$box_status = $child_retv | 128;
+		}else{
+			# This is also executed when there was no error, and the result is zero.
+			$box_status = $child_retv >> 8;
+		}
 		$status = 'exit'
 	}elsif ($arrived == -1){
 		# Something happened!
