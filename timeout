@@ -69,6 +69,7 @@ GetOptions(
 	'debug!'=>\$debug,
 	'just-kill'=>\$just_kill,
 	'info-on-success!'=>\$info_on_success,
+	'confess|c!'=>\$confess,
 ) or usage;
 
 @ARGV or usage;
@@ -169,13 +170,7 @@ while ($status eq 'wait'){
 	if ($arrived == $blackbox_pid){
 		# Child process terminated.
 		# "Simulate" shell behavior, when signal code is returned as exit code.  See http://www.gnu.org/software/bash/manual/html_node/Exit-Status.html for more info.
-		if (($child_retv > 0) && (($child_retv >> 8) == 0)){
-			# The 8th bit indicates if the core was dumped.  If it was not, we are to add 128 anyway, so just set the bit.
-			$box_status = $child_retv | 128;
-		}else{
-			# This is also executed when there was no error, and the result is zero.
-			$box_status = $child_retv >> 8;
-		}
+		$box_status = child_status_to_exit_code($child_retv);
 		$status = 'exit'
 	}elsif ($arrived == -1){
 		# Something happened!
@@ -190,7 +185,14 @@ while ($status eq 'wait'){
 			# have some sleep for output to be flushed
 			usleep($uflush_time);
 			print_uinfo($reason,$uinfo);
-			exit 0;
+			# If we killed the child process, we may need to return its error code.
+			if ($confess) {
+				if (waitpid($blackbox_pid,0) != -1){
+					exit(child_status_to_exit_code($?));
+				}
+			}else{
+				exit 0;
+			}
 		}
 	}
 }
@@ -479,4 +481,17 @@ sub limits_exceeded
 		return 'MEM';
 	}
 	return undef;
+}
+
+# Convert child exit status to exit code.  Follow Bash way.
+sub child_status_to_exit_code
+{
+	my ($child_retv) = @_;
+	if (($child_retv > 0) && (($child_retv >> 8) == 0)){
+		# The 8th bit indicates if the core was dumped.  If it was not, we are to add 128 anyway, so just set the bit.
+		return $child_retv | 128;
+	}else{
+		# This is also executed when there was no error, and the result is zero.
+		return $child_retv >> 8;
+	}
 }

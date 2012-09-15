@@ -70,8 +70,20 @@ Advanced options:
 * `--no-info-on-success` - disable printing usage statistics if the
   controlled process has been successfully terminated.
 
+* `--confess`, `-c` - when killing the controlled process, return its exit
+  code or signal+128.  This also makes timeout to wait until the controlled
+  process is terminated.  Without this option, the script returns zero.
+
 More options may be read in the script itself.  More documentation will be
 added in the future releases!
+
+Exit code of the script is the exit code of the controlled process.  If the
+controlled process was killed by a signal, the exit code is 128+N, where N is
+the number of the signal.  This simulates Bash exit code policy.  If the
+controlled process was terminated by the timeout script itself the script
+returns zero because having the timeout terminate the child is expected
+behavior.  If you want the child's return code in such a situation (which may
+be nonzero if the child handles SIGTERM), use `--confess` option.
 
 
 EXAMPLES
