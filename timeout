@@ -54,7 +54,7 @@ my $info_on_success = 1;
 my $confess = '';
 
 GetOptions(
-	'timelimit|t=i'=>\$timelimit,
+	'timelimit|t=f'=>\$timelimit,
 	'hanguplimit|h=i'=>\$hanguplimit,
 	'detect-hangup!'=>\$kill_stale,
 	'detect-hangups!'=>\$kill_stale,
