@@ -347,7 +347,7 @@ sub kill_process_group_safely
 	$dying = 1;
 	# Reset alarm handler (we need it for sleep to work)
 	$SIG{'ALRM'} = 'DEFAULT';
-	if (!$just_kill) {
+	unless ($just_kill) {
 		print STDERR "timeout: Sending TERM\n" if $debug;
 		signal_to_process_group_safely($pgrp,SIGTERM);
 		sleep(1);
