@@ -175,7 +175,7 @@ while ($status eq 'wait'){
 	}elsif ($arrived == -1){
 		# Something happened!
 		print_uinfo('INTERNAL',$uinfo);
-		print "timeout: WARNING: Wait($blackbox_pid) failed: $child_errno\n";
+		print STDERR "timeout: WARNING: Wait($blackbox_pid) failed: $child_errno\n";
 		exit 0;
 	}else{
 		# Check if limits are exhausted (they should be updated by signal handler).
