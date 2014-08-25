@@ -23,7 +23,7 @@
 
 sub usage{ print STDERR <<usage_ends;
 Usage:
-	timeout [-t timelimit] [-m memlimit] [-x herz] command [argumens ...]
+	timeout [-t timelimit] [-m memlimit] [-x hertz] command [arguments ...]
 
 usage_ends
 	die;
