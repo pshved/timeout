@@ -37,6 +37,7 @@ my $hanguplimit = undef;
 my $kill_stale = '';
 my $ticklimit = undef;
 my $memlimit = undef;
+my $memlimit_rss = undef;
 my $strpat = undef;
 # Output for statistic buckets (STDERR if unspecified)
 my $output = undef;
@@ -61,6 +62,7 @@ GetOptions(
 	# allow-hangups is kept for backward compatibility.
 	'allow-hangups!'=>\$kill_stale,
 	'memlimit|m=i'=>\$memlimit,
+	'memlimit-rss|s=i'=>\$memlimit_rss,
 	'frequency|x=i'=>\$frequency,
 	'pattern|p=s'=>\$strpat,
 	'output|o=s'=>\$output,
@@ -119,9 +121,11 @@ use Time::HiRes qw( ualarm usleep );
 my $timeinfo = { total => 0, finished => 0, current => {} };
 # For this -- update_memory
 my $meminfo = 0;
+my $meminfo_rss = 0;
 my $fulltime = 0;
 # We store the "maximum" used memory (the process may free it and we won't get the proper timestamp at the end).
 my $maxmem = -1;
+my $maxmem_rss = -1;
 
 # Default ticklimit - limit of number of timeout script wakeups (ticks) before we decide that the controlling processes are hang up (if they haven't done any useful work).  We use ticks instead of real time seconds because the whole stack may be paused with SIGSTOP, and should not die in this case.
 #
@@ -147,7 +151,9 @@ while ($status eq 'wait'){
 			# According to signal(7), wait is a safe function, so we can call anything we want here.
 			$timeinfo = update_time($blackbox_pid,$timeinfo);
 			$meminfo = update_memory($blackbox_pid,$meminfo);
+			$meminfo_rss = update_memory_rss($blackbox_pid,$meminfo_rss);
 			$maxmem = $meminfo if $meminfo > $maxmem;
+			$maxmem_rss = $meminfo_rss if $meminfo_rss > $maxmem_rss;
 			update_info_by_ucmd($blackbox_pid,$uinfo);
 			die "Assume waitpid return 0\n";
 		};
@@ -215,23 +221,23 @@ sub foreach_applicable_process
 	if ($watchfor eq 'tree') {
 		# Read ps output of a process tree, and read a subtree of the pid we watch for
 		# The tree will look like this:
-		# 26944 26944 kdeinit4
-		# 26944 26948  \_ klauncher
-		# 26944 12501  \_ kio_pop3
-		# 26944  1591  \_ VirtualBox
-		# 26944  1598  |   \_ VirtualBox
-		# 26944  1644  |       \_ VBoxXPCOMIPCD
-		# 26944 28333  \_ pidgin
-		# 26944 28581  \_ kio_file
-		# 26944 12496 kmail
+		# 26944 26944 1234 kdeinit4
+		# 26944 26948 2341  \_ klauncher
+		# 26944 12501 3412  \_ kio_pop3
+		# 26944  1591 1101  \_ VirtualBox
+		# 26944  1598 1243  |   \_ VirtualBox
+		# 26944  1644 1234  |       \_ VBoxXPCOMIPCD
+		# 26944 28333 9876  \_ pidgin
+		# 26944 28581 8765  \_ kio_file
+		# 26944 12496 7655 kmail
 		my $chars = "\t \\_|";
-		my $PS_FH; open $PS_FH, "-|", qw(ps -e f -o pgrp= -o pid= -o vsz= -o ucmd=) or die "Bad open ps: $!";
+		my $PS_FH; open $PS_FH, "-|", qw(ps -e f -o pgrp= -o pid= -o vsz= -o rss= -o ucmd=) or die "Bad open ps: $!";
 		my $state = 0;	# 0 - still haven't encounter root;	1 - reading tree; (when tree is read, we break the loop)
 		my $initial_depth = undef;	# Initial depth of the root of a tree
 		while (<$PS_FH>){
-			/^\s*([0-9]+)\s*([0-9]+)\s*([0-9]+)([ |\\_]+)(.*)/ or next;
+			/^\s*([0-9]+)\s*([0-9]+)\s*([0-9]+)\s*([0-9]+)([ |\\_]+)(.*)/ or next;
 			#      PID                depth in process tree
-			my ($grp,$pid,$vsz,$depth_str,$cmd) = ($1,$2,$3,$4,$5);
+			my ($grp,$pid,$vsz,$rss,$depth_str,$cmd) = ($1,$2,$3,$4,$5,$6);
 			if ($state == 0){
 				# Still haven't encounter root, check if it's now
 				$pid == $pgrp or next;
@@ -242,18 +248,18 @@ sub foreach_applicable_process
 				length $depth_str == $initial_depth and last;
 			}
 			# Ok, this is a node in the tree we want to process
-			$sub->($pid,$grp,$cmd,$vsz);
+			$sub->($pid,$grp,$cmd,$vsz,$rss);
 		}
 		close $PS_FH or die "Bad close ps: $!";
 	}else{
 		# Read ps output to get all processes within a group. Time output is not necessary, since we calculate it directly via /proc
-		my $PS_FH; open $PS_FH, "-|", qw(ps -A -o pgrp= -o pid= -o vsz= -o ucmd=) or die "Bad open ps: $!";
+		my $PS_FH; open $PS_FH, "-|", qw(ps -A -o pgrp= -o pid= -o vsz= -o rss= -o ucmd=) or die "Bad open ps: $!";
 		while (<$PS_FH>){
-			/^\s*([0-9]+)\s*([0-9]+)\s*([0-9]+)\s*(.*)/ or next;
-			my ($grp,$pid,$vsz,$cmd) = ($1,$2,$3);
+			/^\s*([0-9]+)\s*([0-9]+)\s*([0-9]+)\s*([0-9]+)\s*(.*)/ or next;
+			my ($grp,$pid,$vsz,$rss,$cmd) = ($1,$2,$3,$4);
 			$grp == $pgrp or next;
 
-			$sub->($pid,$grp,$cmd,$vsz);
+			$sub->($pid,$grp,$cmd,$vsz,$rss);
 		}
 		close $PS_FH or die "Bad close ps: $!";
 	}
@@ -303,6 +309,17 @@ sub update_memory
 	my $result = 0;
 	foreach_applicable_process($pgrp,$watchfor,sub { my ($pid,$grp,$cmd,$vsz) = @_;
 		$result += $vsz;
+	});
+	return $result;
+}
+
+sub update_memory_rss
+{
+	# Calculate the amount of rss memory consumed by the process group given
+	my ($pgrp) = @_;
+	my $result = 0;
+	foreach_applicable_process($pgrp,$watchfor,sub { my ($pid,$grp,$cmd,$vsz,$rss) = @_;
+		$result += $rss;
 	});
 	return $result;
 }
@@ -429,7 +446,7 @@ sub print_uinfo
 	my $reason = shift;
 	# Print generic information to STDERR
 	my $ticks = $timeinfo->{ticks_stale} || 0;
-	printf STDERR "${id_str}%s CPU %.2f MEM %d MAXMEM %d STALE %d\n", $reason, $timeinfo->{total}, $meminfo, $maxmem, ceil($ticks/$frequency) if ($reason ne 'FINISHED') || $info_on_success;
+	printf STDERR "${id_str}%s CPU %.2f MEM %d MAXMEM %d STALE %d MAXMEM_RSS %d\n", $reason, $timeinfo->{total}, $meminfo, $maxmem, ceil($ticks/$frequency), $maxmem_rss if ($reason ne 'FINISHED') || $info_on_success;
 
 	if (defined $output){
 		open(FIL,">>", $output) or die "Can't open output file: $!\n";
@@ -481,6 +498,8 @@ sub limits_exceeded
 		return 'HANGUP';
 	}elsif (defined $memlimit && $meminfo > $memlimit){
 		return 'MEM';
+	}elsif (defined $memlimit_rss && $meminfo_rss > $memlimit_rss){
+		return 'MEM_RSS';
 	}
 	return undef;
 }

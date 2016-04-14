@@ -74,6 +74,8 @@ Advanced options:
   code or signal+128.  This also makes timeout to wait until the controlled
   process is terminated.  Without this option, the script returns zero.
 
+* `--memlimit-rss`, `-s` - monitor RSS (resident set size) memory limit
+
 More options may be read in the script itself.  More documentation will be
 added in the future releases!
 
