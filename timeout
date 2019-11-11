@@ -147,7 +147,7 @@ while ($status eq 'wait'){
 		local $SIG{'ALRM'} = sub {
 			# If we're dying don't return to the embracing eval, return somewhere else!
 			return if $dying;
-			# Note that this signal can only interrupt "wait" function (unless we're currently in some internals of Perl implementation of waitpid wrapper, but must of the time we spend inside the wait() call).
+			# Note that this signal can only interrupt "wait" function (unless we're currently in some internals of Perl implementation of waitpid wrapper, but most of the time we spend inside the wait() call).
 			# According to signal(7), wait is a safe function, so we can call anything we want here.
 			$timeinfo = update_time($blackbox_pid,$timeinfo);
 			$meminfo = update_memory($blackbox_pid,$meminfo);
