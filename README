@@ -20,13 +20,13 @@ watched processes is constrained by process group or by the process tree.
 
 Linux now supports the CGroups feature, which is a much better method to track
 memory and time usage and not limited by the issues listed below. This `timeout`
-script does *not* use CGroups. While this script continues to work just fine, if
-you are on Linux and need a more robust monitoring method search for something
-based on CGroups. For system services, have a look at [available systemd
+script **does not use CGroups**. While this script continues to work, if
+you are on Linux and need a more robust monitoring method you **should use something
+based on CGroups**. For system services, have a look at [available systemd
 options](https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html).
 For a simple command-line script to limit memory usage you could for example
-use [this script](http://unix.stackexchange.com/a/279175/50793) based on
-[CGManager](https://linuxcontainers.org/cgmanager/introduction/).
+use [runexec](https://github.com/sosy-lab/benchexec/blob/master/doc/runexec.md),
+which is part of [BenchExec](https://github.com/sosy-lab/benchexec).
 
 
 INSTALLATION
@@ -187,6 +187,13 @@ The script is slow.  It's implemented in Perl, but that's not the reason as
 itself.  Performance of certain portions of it may easily be improved.  Our
 measurements demonstrated that it consumes up to 2% of the CPU time during its
 work.
+
+The script can overlook some child processes (in case of a double fork, for example).
+The resources used by these processes will not be measured and limits won't apply to them.
+Furthermore, these child processes will not be killed when the script terminates.
+
+Due to the use of sampling, all measurements are somewhat imprecise.
+Sort-lived child processes and memory peaks can be overlooked.
 
 Sometimes waitpid call from inside SIGALRM handler returns -1 for no apparent
 reason.  This return value is ignored, and the appropriate warning is printed,
