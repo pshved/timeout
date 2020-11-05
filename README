@@ -113,7 +113,7 @@ Basic time limiting:
     Outputs:
     TIMEOUT 2.04 CPU
 
-Basic memory limiting (100M of virtual memory):
+Basic memory limiting (1000M of virtual memory):
 
     ./timeout -m 1000000 perl -e 'while ($i<100000000) {$a->{$i} = $i++;}'
     Outputs:
